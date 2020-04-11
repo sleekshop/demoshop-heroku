@@ -1,0 +1,25 @@
+{
+  "name": "sleekshop demo",
+  "description": "sleekshop demoshop",
+  "repository": "https://github.com/sleekshop/demoshop-heroku.git",
+  "logo": "https://www.sleekshop.io/images/logo.png",
+  "keywords": ["sleekshop", "demoshop"],
+  "env": {
+    "TOKEN": {
+      "description": "A token for your cookies",
+      "generator": "secret"
+    },
+    "SHOPNAME": {
+      "description": "Your shopname",
+      "value": ""
+    },
+    "LICENCE_USERNAME": {
+      "description": "Licence username",
+      "value": ""
+    },
+    "LICENCE_PASSWORD": {
+      "description": "Licence password",
+      "value": ""
+    }
+   }
+}
