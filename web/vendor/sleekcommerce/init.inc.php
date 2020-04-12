@@ -5,8 +5,8 @@
  *
  * @ Kaveh Raji <kr@sleekcommerce.com>
  */
- define("ROOTPATH", "");
- define("PROJECTPATH", ROOTPATH . "../");
+ define("ROOTPATH", ".");
+ define("PROJECTPATH", ROOTPATH . "/../");
  /*
   * Now including some libaries needed
   */
