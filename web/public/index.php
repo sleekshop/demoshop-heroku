@@ -1,7 +1,4 @@
 <?php
-ini_set("display_errors", "off");
-ini_set("display_startip_errors", "off");
-error_reporting(0);
 require '../vendor/autoload.php';
 require '../vendor/sleekcommerce/init.inc.php';
 
@@ -29,7 +26,7 @@ $app->view->parserOptions = array(
 );
 
 
-$app->view->parserExtensions = array(new Twig_Extension_I18n());
+$app->view->parserExtensions = array(new Twig_Extensions_Extension_I18n());
 
 //Reloading the menu
 $app->get('/reload-menu', function () use ($app,$language,$menu,$username,$cart) {
@@ -39,24 +36,53 @@ $app->get('/reload-menu', function () use ($app,$language,$menu,$username,$cart)
 
 //Reloading the menu
 $app->get('/reload-static-files', function () use ($app,$language,$menu,$username,$cart) {
-    $lang=$app->request->get("language");
-    if($lang=="") $lang=DEFAULT_LANGUAGE;
-    $id=$app->request->get("id_shopobject");
-    $prefix=array_shift(explode("_",$language));
-    $res=ShopobjectsCtl::GetContentDetails($id,$lang);
-    $about_us=$res["attributes"]["about_us_footer"]["value"];
-    unlink("../templates/part_about_us_footer_".$prefix.".html");
-    file_put_contents("../templates/part_about_us_footer_".$prefix.".html",$about_us);
-    $logo=$res["attributes"]["logo"]["value"];
-    unlink("../templates/part_logo.html");
-    file_put_contents("../templates/part_logo.html","<img src='".$logo."' border='0'>");
-    $face=$res["attributes"]["facebook_link"]["value"];
-    $insta=$res["attributes"]["instagram_link"]["value"];
-    unlink("../templates/part_social_links.html");
-    file_put_contents("../templates/part_social_links.html","<a href='".$face."' target='_blank'><img src='../img/facebook.png' width='50px'></a>
-    <a href='".$insta."' target='_blank'><img src='../img/insta.jpg' width='50px'></a>");
-    die("WEBHOOK_EXECUTED");
+  $lang=$app->request->get("language");
+  if($lang=="" OR $lang=="all") $lang=DEFAULT_LANGUAGE;
+  $id=$app->request->get("id_shopobject");
+  $prefix=array_shift(explode("_",$lang));
+  $res=ShopobjectsCtl::GetContentDetails($id,$lang);
+  $about_us=$res["attributes"]["about_us_footer"]["value"];
+  unlink("../templates/part_about_us_footer_".$prefix.".html");
+  file_put_contents("../templates/part_about_us_footer_".$prefix.".html",$about_us);
+  $logo=$res["attributes"]["logo"]["value"];
+  unlink("../templates/part_logo.html");
+  file_put_contents("../templates/part_logo.html","<img src='".$logo."' border='0'>");
+  $face=$res["attributes"]["facebook_link"]["value"];
+  $insta=$res["attributes"]["instagram_link"]["value"];
+  unlink("../templates/part_social_links.html");
+  file_put_contents("../templates/part_social_links.html","<a href='".$face."' target='_blank'><img src='../img/facebook.png' width='50px'></a>
+  <a href='".$insta."' target='_blank'><img src='../img/insta.jpg' width='50px'></a>");
+  echo "WEBHOOK_EXECUTED";
 });
+
+$app->post('/add-coupon', function () use ($app,$language,$menu,$username,$cart,$discount) {
+    $app->log->info("Slim-Skeleton '/' route");
+    // Render index viewdd
+    $coupon=$app->request->post("coupon");
+    $sr=new SleekShopRequest();
+    $json=$sr->add_coupons(SessionCtl::GetSession(),array(array($coupon,"Gutschein")));
+    $json=json_decode($json);
+    $error="";
+    if($json->object == "error")
+    {
+      $error=$json->message;
+    }
+    else {
+      // code...
+    }
+    $res=CartCtl::Get(SessionCtl::GetSession());
+    $app->render('cart.html',array("coupon_error"=>$error,"res"=>$res,"menu"=>$menu,"username"=>$username,"cart"=>$res,"language"=>$language));
+});
+
+
+$app->get("/get-invoice/:id/:hash", function ($id,$hash) use ($app,$language,$menu,$username,$cart) {
+   //$app->log->info("Slim-Skeleton "/" route");
+   if(!(crypt($id,TOKEN)==base64_decode($hash))) die("PERMISSION_DENIED");
+   $invoice=OrderCtl::GetInvoice($id);
+   echo $invoice;
+   die();
+});
+
 
 //For changing the language
 $app->get('/change-lang', function () use ($app,$language,$menu,$username,$cart) {
@@ -70,7 +96,7 @@ $app->get('/change-lang', function () use ($app,$language,$menu,$username,$cart)
     $app->setCookie(TOKEN."_menu","",time()+3600);
     $menu=CategoriesCtl::GetMenu($language);
     $res=ShopobjectsCtl::GetShopObjects(1,$language,"price","ASC",0,0,array("name","img1","price","short_description"));
-    $app->render('index.html',array("res"=>$res,"menu"=>$menu,"username"=>$username,"cart"=>$cart,"language"=>$language));
+    $app->redirect("/");
 });
 
 // Define routes
@@ -110,7 +136,7 @@ $app->get('/category/:obj', function ($obj) use ($app,$request_uri,$language,$me
 
 
 
-$app->post('/add_to_cart', function () use ($app,$language,$menu,$username,$cart) {
+$app->post('/add_to_cart', function () use ($app,$request_uri,$language,$menu,$username,$cart) {
     // Sample log message
     $app->log->info("Slim-Skeleton '/' route");
     // Render index viewdd
@@ -122,7 +148,7 @@ $app->post('/add_to_cart', function () use ($app,$language,$menu,$username,$cart
     //$app->render('index.html',array("res"=>$res));
 });
 
-$app->post('/login', function() use ($app,$language,$menu,$username,$cart) {
+$app->post('/login', function() use ($app,$request_uri,$language,$menu,$username,$cart) {
 
      $username=$app->request->post("username");
      $passwd=$app->request->post("password");
@@ -188,7 +214,7 @@ $app->post('/userdata', function() use ($app,$request_uri,$language,$menu,$usern
       		"delivery_state"=>$userdata["state"],"delivery_city"=>$userdata["city"],"delivery_country"=>$userdata["country"],
       		"invoice_companyname"=>$userdata["company"],"invoice_department"=>$userdata["department"],"invoice_salutation"=>$userdata["salutation"],
       		"invoice_firstname"=>$userdata["firstname"],"invoice_lastname"=>$userdata["lastname"],"invoice_street"=>$userdata["street"],"invoice_number"=>$userdata["number"],"invoice_zip"=>$userdata["zip"],
-      		"invoice_state"=>$userdata["state"],"invoice_city"=>$userdata["city"],"invoice_country"=>$userdata["country"],"note"=>$userdata["note"],"email"=>$userdata["email"]);
+      		"invoice_state"=>$userdata["state"],"invoice_city"=>$userdata["city"],"invoice_country"=>$userdata["country"],"note"=>$userdata["notes"],"email"=>$userdata["email"]);
       $order_data=OrderCtl::SetOrderDetails(SessionCtl::GetSession(),$args);
 
 
@@ -323,37 +349,18 @@ $app->post('/checkout', function() use ($app,$request_uri,$language,$menu,$usern
     * Send the order - email
     */
     $order=OrderCtl::GetOrderDetails(SessionCtl::GetSession());
-    $subject="Danke, wir haben Ihre Bestellung erhalten";
-    $msg="Vielen Dank, wir haben Ihre Bestellung erhalten.\n\n";
-       $msg.="Folgende Produkte haben Sie bestellt:\n\n";
-
-    foreach($cart["contents"] as $e)
-    {
-     $msg.= "Artikel-ID:" . $e["id_product"] . "\n" . $e["name"] . "\n". $e["description"] . "\n". "Anzahl:" . $e["quantity"] . "\nPreis: " .number_format($e["price"],2) .  " EUR\nSumme: " . number_format($e["sum_price"],2) . " EUR\n";
-     $msg.="-----------------------------------------------------------------\n";
-    }
-
-    $msg.="Summe: " . number_format($cart["sum"],2) . " EUR\n\n";
-    $msg.="Bezahlung: " . $order["order_payment_method"]."\n\n";
-    $msg.="Lieferung: " . $order["order_delivery_method"]."\n\n";
-    $msg.="Ihre Daten:\n";
-    $msg.=$order["delivery_salutation"] . " " . $order["delivery_firstname"] . " " . $order["delivery_lastname"] . "\n";
-    $msg.=$order["delivery_street"] . " " . $order["delivery_number"] . "\n";
-    $msg.=$order["delivery_zip"] . " " . $order["delivery_city"] . " " . $order["delivery_country"] . "\n";
-    $msg.="E-Mail: " . $order["email"] . "\n";
-    $msg.="Anmerkungen:\n".$order["notes"];
-
-    send_plain_mail($order["email"],utf8_decode($subject),utf8_decode($msg),ORDER_SENDER);
-    send_plain_mail(ORDER_SENDER,utf8_decode($subject),utf8_decode($msg),ORDER_SENDER);
-   /*
-    * End of email - sending
-    */
+    $subject="Bestellbestätigung";
+    $invoice_link="https://".$_SERVER["HTTP_HOST"]."/get-invoice/".$res["id_order"]."/".base64_encode(crypt($res["id_order"],TOKEN));
+    $msg=OrderCtl::GetOrderConfirmation($res["id_order"],array("invoice_link"=>$invoice_link));
+    send_html_mail($order["email"],utf8_decode($subject),utf8_decode($msg),ORDER_SENDER);
+    send_html_mail(ORDER_SENDER,utf8_decode($subject),utf8_decode($msg),ORDER_SENDER);
    $id_order=$res["id_order"];
    $session=$res["session"];
    SessionCtl::SetSession($session);
    setcookie('cart',"");
    $cart=array();
-   $res=OrderCtl::DoPayment($id_order,array());
+   $res=OrderCtl::DoPayment($id_order,array("success_url"=>"https://".$_SERVER["HTTP_HOST"]."/checkout","cancel_url"=>"https://".$_SERVER["HTTP_HOST"]."/checkout?error=1"));
+   $redirect="";
    if($res["status"]=="Success" AND $res["redirect"]!="")
    {
      $redirect=html_entity_decode($res["redirect"]);
@@ -375,7 +382,7 @@ $app->post('/checkout', function() use ($app,$request_uri,$language,$menu,$usern
    $tpl->assign("missing_id",$res["param"]);
    $pages=array("product_not_available");
   }
-  $app->render("checkout.html",array("token"=>$token,"redirect"=>$redirect,"res"=>$res,"payment_methods"=>$payment_methods,"request_uri"=>$request_uri,"language"=>$language,"menu"=>$menu,"username"=>$username,"cart"=>$cart));
+  $app->render("checkout.html",array("token"=>$token,"redirect"=>$redirect,"res"=>$res,"request_uri"=>$request_uri,"language"=>$language,"menu"=>$menu,"username"=>$username,"cart"=>$cart));
 
 });
 
@@ -394,7 +401,7 @@ $app->post('/register', function() use ($app,$request_uri,$language,$menu,$usern
   	if($res["status"]=="SUCCESS")
   	{
   		UserCtl::VerifyUser($res["id_user"],$res["session_id"]);
-  		$app->render("login.html",array("error_msg"=>$error_msg,"error"=>0,"user"=>$user,"email"=>$email,"cart"=>$cart,"language"=>$language,"menu"=>$menu));
+  		$app->render("login.html",array("error"=>0,"user"=>$user,"email"=>$email,"cart"=>$cart,"language"=>$language,"menu"=>$menu));
   	}
   	else
   	{
@@ -456,25 +463,25 @@ $app->get('/:obj', function ($obj) use ($app,$request_uri,$language,$menu,$usern
          }
          elseif($obj=="your-data")
           {
-            if($_COOKIE["username"]!="")
+            if($username!="")
              {
                 $res=UserCtl::GetUserData(SessionCtl::GetSession());
                 $app->render('userdata.html',array("userdata"=>$res,"menu"=>$menu,"username"=>$username,"cart"=>$cart,"request_uri"=>$request_uri,"language"=>$language));
              }
              else {
-              $app->render('your_data.html',array("res"=>$res,"menu"=>$menu,"username"=>$username,"cart"=>$cart,"request_uri"=>$request_uri,"language"=>$language));
+              $app->render('your_data.html',array("menu"=>$menu,"username"=>$username,"cart"=>$cart,"request_uri"=>$request_uri,"language"=>$language));
              }
           }
           elseif($obj=="login")
            {
              $profile=$app->request->get("profile");
-             $app->render('login.html',array("res"=>$res,"menu"=>$menu,"username"=>$username,"cart"=>$cart,"request_uri"=>$request_uri,"profile"=>$profile,"language"=>$language));
+             $app->render('login.html',array("menu"=>$menu,"username"=>$username,"cart"=>$cart,"request_uri"=>$request_uri,"profile"=>$profile,"language"=>$language));
            }
            elseif($obj=="logout")
             {
               UserCtl::Logout(SessionCtl::GetSession());
               setcookie('username',"");
-              $app->render('logout.html',array("res"=>$res,"menu"=>$menu,"username"=>"","cart"=>$cart,"request_uri"=>$request_uri,"language"=>$language));
+              $app->render('logout.html',array("menu"=>$menu,"username"=>"","cart"=>$cart,"request_uri"=>$request_uri,"language"=>$language));
             }
           elseif($obj=="profile")
            {
@@ -489,12 +496,12 @@ $app->get('/:obj', function ($obj) use ($app,$request_uri,$language,$menu,$usern
            }
           elseif($obj=="register")
            {
-             $app->render("register.html",array("res"=>$res,"menu"=>$menu,"username"=>$username,"cart"=>$cart,"request_uri"=>$request_uri,"language"=>$language));
+             $app->render("register.html",array("menu"=>$menu,"username"=>$username,"cart"=>$cart,"request_uri"=>$request_uri,"language"=>$language));
            }
            elseif($obj=="userdata")
             {
               //$order_data=OrderCtl::GetOrderDetails(SessionCtl::GetSession());
-              $app->render('userdata.html',array("userdata"=>$order_data,"menu"=>$menu,"cart"=>$cart,"username"=>$username,"language"=>$language));
+              $app->render('userdata.html',array("menu"=>$menu,"cart"=>$cart,"username"=>$username,"language"=>$language));
             }
            elseif($obj=="order_summary")
            {
@@ -526,7 +533,7 @@ $app->get('/:obj', function ($obj) use ($app,$request_uri,$language,$menu,$usern
        else {
          if(is_numeric($obj))
          {
-           $res=ShopobjectsCtl::GetProductDetails($obj);
+           $res=ShopobjectsCtl::GetProductDetails($obj,$language);
          }
          else {
            $res=ShopobjectsCtl::SeoGetProductDetails($obj);

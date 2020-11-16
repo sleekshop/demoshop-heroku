@@ -9,7 +9,7 @@ define("MYSQL_USER","");
 define("MYSQL_PASSWD","");
 define("MYSQL_DB","");
 //The unique shop - token
-define("TOKEN",getenv("TOKEN"));
+define("TOKEN","testshop");
 //the default  language
 define("DEFAULT_LANGUAGE","de_DE");
 //Thum-pic size
